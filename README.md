@@ -17,6 +17,8 @@
 
 pg_ripple is a PostgreSQL 18 extension that turns your database into a knowledge graph store. You can model data as a web of connected facts — entities, relationships, and properties — and then query, validate, and reason over those connections, all from within the database you already run.
 
+The [shared project glossary](GLOSSARY.md) defines the terms used in the code, documentation, and conversations around pg_ripple.
+
 No separate graph database. No data pipelines. No extra infrastructure.
 
 > **New to knowledge graphs?** Think of a knowledge graph as a smarter, more connected way to store data. Instead of rows in tables, you store facts: *Alice knows Bob*, *Bob works at Acme Corp*, *Acme Corp is in Oslo*. You can then ask questions that span many hops: *"Who are all the people in Alice's extended professional network?"* — the kind of question that is painful in SQL but natural in a graph.
