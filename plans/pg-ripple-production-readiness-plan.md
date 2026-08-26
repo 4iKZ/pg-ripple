@@ -36,8 +36,8 @@ The production-readiness program should follow five rules:
 | HTTP authentication is optional and public bind is the default | Accidental unauthenticated exposure | v0.131.0 |
 | Required conformance jobs may skip or remain non-blocking | Green CI does not prove public conformance claims | v0.132.0 |
 | Crash recovery, backup/restore, and failover evidence is incomplete | Operational behavior is not qualified | v0.133.0 |
-| Scale evidence is stale and important scans are unbounded or quadratic | Performance claims are not release-grade | v0.134.0 |
-| Public API, GUC, schema, and feature-stability contracts remain fluid | No defensible compatibility promise | v0.135.0 |
+| Scale evidence is stale, important scans are unbounded or quadratic, and HTTP result paths buffer or do not emit rows | Performance and streaming claims are not release-grade | v0.134.0 |
+| Applications lack typed initial bindings, SPARQL cannot opt into the existing prefix registry, and public contracts remain fluid | Callers interpolate query text and there is no defensible compatibility promise | v0.135.0 |
 | No external security audit report is on file | Native superuser extension and HTTP attack surface lack independent assurance | v0.136.0 |
 | No exact-candidate 72-hour mixed-workload qualification artifact is on file | Long-running stability remains unproven | v0.137.0 |
 
@@ -142,10 +142,10 @@ No beta or experimental feature may block the stable core from shipping, but it 
 | **v0.131.0** | Secure-by-default runtime and packaging | Security release | Production deployments fail closed and least privilege is verified |
 | **v0.132.0** | Conformance, feature truth, and release evidence | Assurance release | Required suites cannot skip; claims are artifact-backed |
 | **v0.133.0** | Crash recovery, backup, failover, and operations | Resilience release | Fault-injection and recovery matrix passes |
-| **v0.134.0** | Performance and scale qualification | Performance release | Current raw benchmarks published; regressions and unbounded paths gated |
-| **v0.135.0** | API, schema, GUC, and compatibility freeze | RC0 | Stable surface manifest frozen and breaking-change gate active |
-| **v0.136.0** | External audit remediation and hardened candidate | RC1 | External audit has no unresolved Critical or High findings |
-| **v0.137.0** | Final GA qualification | RC2 | Exact candidate passes 72-hour soak and two zero-High readiness assessments |
+| **v0.134.0** | Performance, scale, and true streaming qualification | Performance release | Large results use bounded memory and backpressure; disconnects and deadlines cancel PostgreSQL work; current evidence passes |
+| **v0.135.0** | Safe application query API and compatibility freeze | RC0 | Typed bindings and registered-prefix mode pass security/cache gates; stable manifest and breaking-change gate are active |
+| **v0.136.0** | External audit remediation and hardened candidate | RC1 | Audit covers streaming, bindings, prefix privileges, and invalidation with no unresolved Critical or High findings |
+| **v0.137.0** | Final GA qualification | RC2 | Exact candidate passes the 72-hour streaming/binding/prefix workload and two zero-High readiness assessments |
 | **v1.0.0** | General Availability | GA | Exact qualified candidate promoted with complete evidence bundle |
 
 ---
@@ -814,11 +814,11 @@ Publish runbooks for every failure scenario in `docs/src/operations/`.
 
 ---
 
-## v0.134.0 — Performance and scale qualification
+## v0.134.0 — Performance, scale, and true streaming qualification
 
 ### Objective
 
-Replace aspirational or stale performance claims with current, reproducible evidence and bound known pathological paths.
+Replace aspirational or stale performance claims with current, reproducible evidence, bound known pathological paths, and complete the existing HTTP streaming contract with backpressure, deadlines, cancellation, and clean pool reuse.
 
 ### Required changes
 
@@ -831,6 +831,16 @@ Replace aspirational or stale performance claims with current, reproducible evid
 - Implement predicate-candidate pruning from constants, graph restrictions, statistics, or catalog metadata before building `UNION ALL` SQL.
 - Measure planning time independently from execution time.
 - Bound response, export, inference, and federation memory.
+
+#### Complete true HTTP streaming
+
+- Replace streaming-path `tokio_postgres::Client::query()` calls with direct `query_raw()`/`RowStream` polling from the HTTP body.
+- Share one execution path between streaming-safe `/sparql` responses and `/sparql/stream`.
+- Preserve typed RDF terms and projected-variable metadata, including empty result sets.
+- Emit independently parseable SPARQL Results JSON, CSV, TSV, and N-Triples with bounded encoder buffers.
+- Enforce slow-client backpressure, statement and idle deadlines, and PostgreSQL cancellation on disconnect, timeout, shutdown, or encoder failure.
+- Commit or roll back before pool reuse and discard connections whose session state cannot be proven clean.
+- Record first-byte latency, rows, bytes, active streams, errors, cancellation reasons/failures, and connection discards.
 
 #### Benchmark environment
 
@@ -864,7 +874,7 @@ Workloads should include:
 - Merge backlog and recovery.
 - Export throughput and peak memory.
 - Datalog and SHACL workloads in the stable scope.
-- HTTP concurrency and streaming.
+- HTTP streaming at 1, 10, 100, and 500 concurrent clients, including slow readers and deliberate disconnects.
 - JSON writeback queue throughput and lag.
 
 #### Regression gates
@@ -874,6 +884,23 @@ Workloads should include:
 - Fail if planning time grows superlinearly beyond the documented predicate-catalog threshold.
 - Require a signed baseline-update justification for intentional changes.
 
+Streaming changes additionally require these blocking jobs:
+
+```text
+http-stream-format
+http-stream-first-byte
+http-stream-disconnect-cancel
+http-stream-timeout
+http-stream-slow-client
+http-stream-memory
+http-stream-pool-reuse
+regress-v0134-streaming
+migration-0133-to-0134
+benchmark-streaming
+```
+
+The memory job streams at least one million rows within a fixed RSS envelope. The disconnect job proves the backend query leaves `pg_stat_activity`; timeout covers local and replica-routed work; pool reuse proves no transaction or setting leaks. Format tests use independent parsers. Every job reports assertion counts and uploads raw evidence; no required job may skip successfully or use `continue-on-error`.
+
 #### Comparative evidence
 
 Run a small, fair comparison against at least two established RDF engines using the same hardware, dataset, query files, warm-up policy, and reporting. Present the result as evidence, not marketing; include cases where pg-ripple is slower.
@@ -882,18 +909,36 @@ Run a small, fair comparison against at least two established RDF engines using 
 
 - Current raw benchmark artifacts exist for the candidate.
 - Known OFFSET and unbounded UNION behavior is fixed or explicitly bounded.
+- Streaming-safe formats do not buffer full results, and slow readers do not create unbounded buffering.
+- Disconnects and deadlines cancel PostgreSQL work; subsequent pool users receive clean sessions.
+- JSON, CSV, TSV, and N-Triples outputs pass independent parsers and preserve RDF term types.
 - Performance claims identify exact hardware and dataset.
 - No unapproved regression exceeds the release thresholds.
 
 ---
 
-## v0.135.0 — API, schema, GUC, and compatibility freeze
+## v0.135.0 — Safe application query API and compatibility freeze
 
 ### Objective
 
-Define the contract that v1.x will support and remove pre-GA architectural decisions that would otherwise become permanent liabilities.
+Add typed initial SPARQL bindings and opt-in governed prefix resolution, define the contract that v1.x will support, and remove pre-GA architectural decisions that would otherwise become permanent liabilities.
 
 ### Required decisions
+
+#### Typed initial bindings
+
+- Add binding overloads for `sparql()`, `sparql_construct()`, `sparql_describe()`, and `sparql_cursor()` using the W3C SPARQL Results JSON term shape.
+- Parse and validate URI/literal values, variables, limits, and query scope before execution; reject blank nodes, RDF-star terms, multi-row bindings, and parameterized Update in v1.
+- Apply bindings after parsing as a programmatically constructed one-row algebra relation. Never substitute into SPARQL text or concatenate values into generated SQL.
+- Dictionary-encode values and pass typed SQL parameters. Cache by query structure and binding names/types, not values.
+- Add authenticated `POST /sparql/bindings` and reuse the v0.134 streaming, timeout, cancellation, authorization, rate-limit, replica, and format paths.
+
+#### Registered prefix mode
+
+- Keep `pg_ripple.sparql_prefix_mode = 'strict'` as the default and add explicit `registered` mode.
+- Extend the existing `_pg_ripple.prefixes` registry with validated ownership, timestamps, restricted mutations, and transactional generation state; do not add a parallel registry.
+- Query-local declarations always win. Add only missing validated prologue declarations in deterministic order; never search and replace QName-looking text.
+- Include registry generation in registered-mode plan keys. Committed changes invalidate affected plans; rolled-back changes alter neither generation nor cache behavior.
 
 #### Public schema name
 
@@ -948,9 +993,30 @@ select * from pg_ripple.supported_surface('v1');
 
 It should list the exact stable features, optional dependencies, unsupported combinations, and evidence artifact.
 
+#### Query-interface test gates
+
+```text
+regress-v0135-bindings
+regress-v0135-prefix-mode
+http-bindings
+bindings-plan-cache
+prefix-cache-invalidation
+bindings-security-negative
+bindings-fuzz-smoke
+prefix-fuzz-smoke
+api-stability-manifest
+migration-0134-to-0135
+fresh-vs-upgrade-0135
+```
+
+Regression coverage includes every supported query form and FILTER, OPTIONAL, UNION, MINUS, VALUES, BIND, subqueries, aggregation/HAVING, paths, named graphs, and federation policy. Security-negative tests prove binding and prefix payloads cannot alter query, SQL, prologue, or catalog semantics. HTTP tests rerun v0.134 backpressure, timeout, disconnect cancellation, replica, and pool-cleanup behavior. Fuzz jobs retain corpora and artifacts; migration checks preserve populated prefix registries and compare fresh versus upgraded schemas and privileges. Required jobs report assertion counts and cannot skip successfully.
+
 ### Exit criteria
 
 - Stable SQL, HTTP, GUC, error, and catalog contracts are checked in and CI-enforced.
+- Typed bindings pass semantic, injection-negative, plan-reuse, HTTP, and fuzz gates without putting values into SPARQL or SQL text.
+- Strict prefix mode remains the default; registered mode is deterministic, permission-controlled, transactional, and cache-safe.
+- Fresh and upgraded v0.135 installations are schema-, privilege-, and behavior-equivalent.
 - The public schema/`allow_system_table_mods` decision is closed.
 - No new public API is accepted after this version except to remediate a release blocker.
 - v0.135.0 is declared RC0 and begins the code-freeze period.
@@ -976,6 +1042,9 @@ The external assessment should include:
 - HTTP authentication and authorization.
 - SSRF, DNS rebinding, redirects, credential handling, and egress control.
 - Parser and query resource exhaustion.
+- HTTP streaming backpressure, deadlines, cancellation, transaction/session cleanup, output encoding, and connection-pool reuse.
+- Typed binding parsing, generated SQL parameters, plan reuse, and injection-negative boundaries.
+- Prefix-registry privileges, prologue processing, transactional generation, and cache invalidation.
 - Docker, Compose, Helm, and supply-chain defaults.
 - Upgrade and migration privilege preservation.
 
@@ -1022,6 +1091,9 @@ Use a mixed workload that includes:
 - Merge and predicate promotion.
 - Stable-scope SHACL and reasoning.
 - HTTP queries and streaming.
+- Large streams, slow clients, deliberate disconnects, request deadlines, and replica-routed cancellation.
+- Parameterized queries with varying values and concurrent execution.
+- Committed and rolled-back prefix changes with concurrent registry reads.
 - JSON writeback if proposed as stable.
 - Planned PostgreSQL restart and sidecar restart.
 - Backup during load and restore verification in a parallel environment.
@@ -1037,6 +1109,8 @@ Use a mixed workload that includes:
 - No monotonic memory leak: final steady-state RSS no more than 15% above the first steady-state hour, with no positive unbounded slope.
 - Queue lag and merge backlog remain within documented capacity thresholds.
 - p95 and p99 latency remain within the v0.134.0 accepted performance envelope.
+- Stream memory remains within the v0.134.0 envelope and cancellation latency remains within its accepted bound.
+- No stale binding or registered-prefix plan is observed across committed or rolled-back generation changes.
 - No High or Critical vulnerability appears in a final scan.
 
 ### Final assessment and documentation
@@ -1119,6 +1193,12 @@ conformance-smoke
 crash-recovery-fast
 benchmark-smoke
 helm-security
+http-stream-format
+http-stream-disconnect-cancel
+http-bindings
+bindings-security-negative
+api-stability-manifest
+fresh-vs-upgrade-0135
 ```
 
 No required check may use `continue-on-error`, `|| true`, or successful skip behavior.
@@ -1131,6 +1211,8 @@ No required check may use `continue-on-error`, `|| true`, or successful skip beh
 - Crash-recovery matrix.
 - Dependency and image scan.
 - Medium-tier benchmarks.
+- Streaming memory, slow-client, timeout, cancellation, pool-reuse, and concurrency qualification.
+- Retained-corpus binding JSON and prefix-prologue fuzzing.
 - Documentation and feature-evidence regeneration check.
 
 ## 7.3 Release qualification

@@ -299,7 +299,7 @@
 
 ### Production Readiness & GA Qualification (v0.128.1 – v0.137.0)
 
-> **Feature freeze:** [The production-readiness plan](plans/pg-ripple-production-readiness-plan.md) replaces the compressed A18 schedule. Each milestone is evidence-gated; no new product families or experimental feature work enter the stable surface before v1.0.0.
+> **Feature freeze:** [The production-readiness plan](plans/pg-ripple-production-readiness-plan.md) replaces the compressed A18 schedule. The [pre-1.0 query-interface amendment](plans/pg-ripple-pre-1.0-query-features-plan.md) closes two existing core-interface gaps in v0.134.0 and v0.135.0 without adding a product family. Each milestone is evidence-gated; no other experimental feature work enters the stable surface before v1.0.0.
 
 | Version | Theme | Status | Release type | Primary gate |
 |---------|-------|--------|--------------|--------------|
@@ -309,10 +309,10 @@
 | [v0.131.0](plans/pg-ripple-production-readiness-plan.md#v01310--secure-by-default-runtime-and-packaging) | Secure-by-default runtime and packaging | Planned | Security release | Production deployments fail closed and least privilege is verified |
 | [v0.132.0](plans/pg-ripple-production-readiness-plan.md#v01320--conformance-feature-truth-and-release-evidence) | Conformance, feature truth, and release evidence | Planned | Assurance release | Required suites cannot skip; claims are artifact-backed |
 | [v0.133.0](plans/pg-ripple-production-readiness-plan.md#v01330--crash-recovery-backup-failover-and-operations) | Crash recovery, backup, failover, and operations | Planned | Resilience release | Fault-injection and recovery matrix passes |
-| [v0.134.0](plans/pg-ripple-production-readiness-plan.md#v01340--performance-and-scale-qualification) | Performance and scale qualification | Planned | Performance release | Current raw benchmarks published; regressions and unbounded paths gated |
-| [v0.135.0](plans/pg-ripple-production-readiness-plan.md#v01350--api-schema-guc-and-compatibility-freeze) | API, schema, GUC, and compatibility freeze | Planned | RC0 | Stable surface manifest frozen and breaking-change gate active |
-| [v0.136.0](plans/pg-ripple-production-readiness-plan.md#v01360--external-audit-remediation-and-hardened-candidate) | External audit remediation and hardened candidate | Planned | RC1 | External audit has no unresolved Critical or High findings |
-| [v0.137.0](plans/pg-ripple-production-readiness-plan.md#v01370--final-ga-qualification) | Final GA qualification | Planned | RC2 | Exact candidate passes 72-hour soak and two zero-High readiness assessments |
+| [v0.134.0](roadmap/v0.134.0.md) | Performance, scale, and true streaming qualification | Planned | Performance release | Large results use bounded memory and backpressure; disconnects and deadlines cancel PostgreSQL work; current raw evidence passes |
+| [v0.135.0](roadmap/v0.135.0.md) | Safe application query API and compatibility freeze | Planned | RC0 | Typed bindings cannot alter syntax; registered prefixes are opt-in, governed, transactional, and cache-safe; the v1 manifest is frozen |
+| [v0.136.0](plans/pg-ripple-production-readiness-plan.md#v01360--external-audit-remediation-and-hardened-candidate) | External audit remediation and hardened candidate | Planned | RC1 | External audit covers streaming, bindings, prefix privileges, and cache invalidation with no unresolved Critical or High findings |
+| [v0.137.0](plans/pg-ripple-production-readiness-plan.md#v01370--final-ga-qualification) | Final GA qualification | Planned | RC2 | Exact candidate passes the 72-hour streaming/binding/prefix workload and two zero-High readiness assessments |
 
 <!-- Superseded A18 allocation retained below for assessment traceability.
 
@@ -339,9 +339,9 @@ Each criterion has a corresponding CI gate or documented evidence requirement.
 | **(c)** | Secure defaults and least privilege | Public deployments fail closed; container auth, route authorization, database TLS, and least-privilege tests pass |
 | **(d)** | Conformance and product truth | Required suites cannot skip or run zero tests; public stable claims are backed by signed artifact evidence |
 | **(e)** | Resilience and recoverability | Crash, restart, backup, restore, PITR, replica promotion, and resource-pressure qualification passes |
-| **(f)** | Performance qualification | Current raw benchmarks are published; regressions, memory use, and pathological query paths remain within accepted bounds |
-| **(g)** | Compatibility freeze | Stable SQL, HTTP, GUC, schema, error, and sidecar contracts are captured in a CI-enforced manifest |
-| **(h)** | Independent assurance and final qualification | External audit has no unresolved Critical or High findings; the exact candidate passes the 72-hour workload and two consecutive zero-High readiness assessments |
+| **(f)** | Performance and streaming qualification | Current raw benchmarks are published; large results use bounded memory and backpressure; disconnects and deadlines cancel PostgreSQL work; regressions and pathological paths remain within accepted bounds |
+| **(g)** | Safe query API and compatibility freeze | Typed bindings cannot alter SPARQL or SQL syntax; registered prefixes remain opt-in and cache-safe; stable SQL, HTTP, GUC, schema, error, and sidecar contracts are captured in a CI-enforced manifest |
+| **(h)** | Independent assurance and final qualification | External audit covers streaming cancellation, binding parsing, prefix privileges, and cache invalidation with no unresolved Critical or High findings; the exact candidate passes the 72-hour workload and two consecutive zero-High readiness assessments |
 
 Progress against these criteria is tracked in each assessment report and confirmed before tagging v1.0.0.
 
@@ -350,8 +350,8 @@ Progress against these criteria is tracked in each assessment report and confirm
 | Version | Theme | Status | Scope | Full details |
 |---------|-------|--------|-------|-------------- |
 | [v1.0.0](plans/pg-ripple-production-readiness-plan.md#v100--general-availability) | **General Availability** — promote the exact v0.137.0 candidate without behavior changes after correctness, migration, security, conformance, resilience, performance, compatibility, external-audit, and 72-hour qualification gates pass; publish immutable artifacts, provenance, signed SBOMs, support policies, and the complete release-evidence bundle | Planned | Medium | [Full details](plans/pg-ripple-production-readiness-plan.md#v100--general-availability) |
-| [v1.1.0](roadmap/v1.1.0.md) | **Post-GA ecosystem & performance** — Cypher/GQL read-only transpiler (`MATCH … RETURN`) + write operations (`CREATE`/`SET`/`DELETE`) enabling graph-database users to query pg_ripple without learning SPARQL; Jupyter SPARQL kernel for interactive notebook exploration; LangChain/LlamaIndex tool packages for LLM orchestration workflows; Kafka CDC sink for event-driven knowledge graph updates; materialized SPARQL views with configurable refresh; dbt adapter; SPARQL endpoint FDW; pgai in-database embedding generation; logical replication for pg_ripple knowledge graphs across instances; **(FEAT-04 / PERF-M-01)** true `COPY FROM STDIN WITH (FORMAT binary)` bulk load path via `pgrx::copy_in` API eliminating parse/plan overhead for 100M+ triple loads (2–3× improvement over UNNEST-array path activated in v0.113.0); **(FEAT-07)** SPARQL federation mTLS client-certificate support and JWKS-endpoint-backed JWT verification for enterprise SPARQL endpoints requiring mutual TLS — extends the OAuth2/API-key credentials from v0.126.0 | Planned | Large | [Full details](roadmap/v1.1.0-full.md) |
-| [v1.2.0](roadmap/v1.2.0.md) | **Custom IndexAM & declarative partitioning** — **(WC-01)** native PostgreSQL index access method for `(s, p, o, g)` quad patterns enabling parallel index-only scans for SPARQL BGPs and 2–5× faster large-graph scans; **(WC-03)** declarative VP table partitioning: `PARTITION BY LIST (g)` for large multi-tenant deployments with per-tenant partition pruning; **(FEAT-09)** Knowledge Graph Diff/Delta Export: `pg_ripple.kg_diff(graph_iri, from_version, to_version) → TABLE` and `GET /graphs/{iri}/delta?from=&to=` HTTP endpoint exporting added/removed quads as N-Quads or JSON-LD patches for external consumers (event sourcing, CDC, audit compliance); **(FEAT-07 extended)** SPARQL endpoint federation JWKS endpoint for RS256/ES256 JWT verification — completes the enterprise auth story from v1.1.0 | Planned | Very Large | [Full details](roadmap/v1.2.0-full.md) |
+| [v1.1.0](roadmap/v1.1.0.md) | **Prepared SPARQL query registry and client conveniences** — build on the v1 typed-binding contract with `prepare_sparql()`, `execute_sparql()`, `drop_prepared_sparql()`, and `list_prepared_sparql()` for read query forms; validate typed parameter schemas and query forms at prepare time; enforce owner and explicit execute privileges; pin strict/registered prefix policy; invalidate compiled plans on schema, prefix, or extension generation changes; execute through the v1 streaming pipeline; exclude automatic HTTP route generation, scheduling, stored credentials, and SPARQL Update; move Jupyter, LangChain/LlamaIndex, dbt, Kafka, Cypher/GQL, and other ecosystem work to separate packages or later roadmap versions | Planned | Large | [Full details](roadmap/v1.1.0-full.md) |
+| [v1.2.0](roadmap/v1.2.0.md) | **Custom IndexAM & declarative partitioning** — **(WC-01)** native PostgreSQL index access method for `(s, p, o, g)` quad patterns enabling parallel index-only scans for SPARQL BGPs and 2–5× faster large-graph scans; **(WC-03)** declarative VP table partitioning: `PARTITION BY LIST (g)` for large multi-tenant deployments with per-tenant partition pruning; **(FEAT-09)** Knowledge Graph Diff/Delta Export: `pg_ripple.kg_diff(graph_iri, from_version, to_version) → TABLE` and `GET /graphs/{iri}/delta?from=&to=` HTTP endpoint exporting added/removed quads as N-Quads or JSON-LD patches for external consumers (event sourcing, CDC, audit compliance); **(FEAT-07)** SPARQL endpoint federation mTLS client-certificate support and JWKS endpoint verification for RS256/ES256 JWTs | Planned | Very Large | [Full details](roadmap/v1.2.0-full.md) |
 | [v1.3.0](roadmap/v1.3.0.md) | **OWL 2 EL/QL profiles, columnar cold-tier storage, and GNN integration** — **(FEAT-05)** OWL 2 EL profile full rule-set in Datalog: OWL 2 EL is widely used in biomedical ontologies (SNOMED CT, Gene Ontology, NCIt) and has tractable reasoning; implement the normative rule tables for EL (`cls-oo`, `prp-ap`, `cax-sco`, `scm-cls`, `scm-op`, `scm-dp` and EL-specific rules) with a dedicated fixpoint strategy optimised for the EL complexity class; add OWL 2 QL profile targeting large ABox instances with efficient first-order-rewritable queries; extend `_pg_ripple.owl_profiles` catalog with `'EL'` and `'QL'` entries; add 50 OWL 2 EL pg_regress tests using SNOMED-subset fixture; **(FEAT-06)** columnar cold-tier storage via Parquet — VP tables with billions of triples exceeding the HTAP hot-tier threshold can be archived to a Parquet cold tier using `pg_parquet` FDW or DuckDB FDW; `pg_ripple.tier_threshold_triples` GUC (default 100M) controls automatic cold-tiering; SPARQL query router transparently unions hot VP table with cold Parquet scan; 5–20× storage compression and 5–20× scan throughput improvement for analytical SPARQL; **(FEAT-08)** Graph Neural Network integration — in-database GNN training bridge: `pg_ripple.gnn_encode(model_name TEXT, graph_iri TEXT) → TABLE(entity BIGINT, embedding FLOAT4[])` exporting entity embeddings from a trained PyG/DGL model via a Python extension bridge; `pg_ripple.gnn_predict_links(model_name TEXT, subject BIGINT, k INT) → TABLE(object BIGINT, score FLOAT4)` for link prediction queries over trained embeddings, replacing the TransE/RotatE-only approach from v0.57.0 with full GNN model support; requires `pg_python` or `plpython3u` bridge | Planned | Very Large | [Full details](roadmap/v1.3.0.md) |
 
 ## How these versions fit together
@@ -691,32 +691,32 @@ v0.132.0       ─── Conformance and product truth: pinned corpora, non-skip
 v0.133.0       ─── Resilience qualification: fault injection, crash recovery,
                │   backup/restore/PITR, failover, resource pressure, and runbooks
        │
-v0.134.0       ─── Performance qualification: bounded pathological paths, current
-               │   reproducible benchmarks, scale tiers, and regression gates
+v0.134.0       ─── Performance, scale, and true streaming qualification: bounded
+               │   paths and memory; direct RowStream delivery; valid encoders;
+               │   backpressure, deadlines, disconnect cancellation, and clean reuse
        │
-v0.135.0       ─── RC0 compatibility freeze: public schema decision and stable SQL,
-               │   HTTP, GUC, catalog, error, and feature-surface manifests
+v0.135.0       ─── Safe application query API and RC0 compatibility freeze: typed
+               │   algebra-level bindings; parameterized SQL; strict/registered
+               │   prefix mode; cache invalidation; stable surface manifest
        │
-v0.136.0       ─── RC1 external-audit remediation: frozen artifacts assessed,
-               │   all Critical and High findings closed with regression tests
+v0.136.0       ─── RC1 external-audit remediation: frozen artifacts, streaming
+               │   lifecycle, bindings, prefix privileges, and cache invalidation
+               │   assessed; all Critical and High findings closed with tests
        │
-v0.137.0       ─── RC2 final qualification: exact signed candidate passes the
-               │   72-hour mixed workload and two zero-High readiness assessments
+v0.137.0       ─── RC2 final qualification: exact signed candidate passes 72 hours
+               │   of large/slow/disconnected streams, varying bindings, prefix
+               │   changes, and the existing mixed workload; two zero-High reviews
        │
 v1.0.0         ─── General Availability: promote the qualified candidate unchanged;
                │   publish immutable artifacts and the complete evidence bundle
        │
-v1.1           ─── Post-stable ecosystem & performance: Cypher/GQL transpiler
-               │   (read-only + write ops), Jupyter kernel, LangChain/LlamaIndex
-               │   tools, Kafka CDC sink, materialized SPARQL views, dbt adapter,
-               │   SPARQL endpoint FDW, pgai embedding, logical replication;
-               │   true COPY FROM STDIN binary bulk load path (FEAT-04 / PERF-M-01,
-               │   2–3× over UNNEST-array); federation mTLS client-cert support
-               │   and JWKS-backed JWT verification (FEAT-07)
+v1.1           ─── Prepared SPARQL registry: validated read queries and typed parameter
+               │   schemas; owner/execute grants; pinned prefix policy; generation-
+               │   based invalidation; execution through v1 bindings and streaming
        │
 v1.2           ─── Custom IndexAM for triple patterns (WC-01); declarative VP
                │   table partitioning by named graph (WC-03); Knowledge Graph
-               │   Diff/Delta Export API (FEAT-09); JWKS JWT extended
+               │   Diff/Delta Export API (FEAT-09); federation mTLS and JWKS JWT
        │
 v1.3           ─── OWL 2 EL/QL profiles (FEAT-05): full EL rule-set in Datalog,
                │   biomedical ontology support (SNOMED, GO, NCIt); columnar
@@ -952,17 +952,15 @@ relational writeback. The feature freeze then begins: v0.128.1 contains release-
 HTTP, container-auth, and writeback behavior; v0.129.0 establishes mutation integrity;
 v0.130.0 qualifies installation and upgrades; v0.131.0 makes runtime and packaging secure
 by default; v0.132.0 makes conformance and feature claims artifact-backed; v0.133.0 proves
-crash recovery, backup, and failover; v0.134.0 qualifies performance and scale; v0.135.0
-freezes the stable API and compatibility surface; v0.136.0 closes external-audit findings;
-and v0.137.0 qualifies one exact candidate under the 72-hour mixed workload. v1.0.0
-promotes that candidate unchanged and publishes the complete signed evidence bundle.
-v1.1.0 delivers post-stable improvements: Cypher/GQL transpiler (read-only and write
-operations), Jupyter SPARQL kernel, LangChain/LlamaIndex tool packages, Kafka CDC sink,
-materialized SPARQL views, a dbt adapter, a SPARQL endpoint FDW, pgai in-database
-embedding generation, logical replication for pg_ripple knowledge graphs, the true
-`COPY FROM STDIN WITH (FORMAT binary)` bulk load path (FEAT-04) delivering another 2–3×
-throughput improvement over the UNNEST-array path, and SPARQL federation mTLS/JWKS
-enterprise authentication (FEAT-07). v1.2.0 delivers the Custom IndexAM for triple
+crash recovery, backup, and failover; v0.134.0 qualifies performance, scale, true HTTP
+streaming, backpressure, timeout, and cancellation; v0.135.0 adds typed SPARQL bindings,
+governed opt-in registered prefixes, and freezes the stable compatibility surface;
+v0.136.0 audits those additions and closes external-audit findings; and v0.137.0 qualifies
+one exact candidate under the 72-hour mixed workload. v1.0.0 promotes that candidate
+unchanged and publishes the complete signed evidence bundle. v1.1.0 adds a governed
+prepared SPARQL registry with typed parameter schemas, owner and execute privileges,
+generation-based invalidation, and execution through the v1 binding and streaming paths.
+The broader ecosystem proposals move to separate packages or later versions. v1.2.0 delivers the Custom IndexAM for triple
 patterns (WC-01) — a native PostgreSQL index access method that understands `(s, p, o, g)`
 quad patterns for parallel index-only BGP scans — declarative VP table partitioning by
 named graph (WC-03) for large multi-tenant deployments, and the Knowledge Graph Diff/Delta
