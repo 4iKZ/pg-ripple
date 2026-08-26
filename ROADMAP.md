@@ -297,7 +297,24 @@
 | [v0.127.0](roadmap/v0.127.0.md) | **pg_tide relay migration cleanup** — move CDC bridge relay gating from `has_pg_trickle()` to `has_pg_tide()`; add `pg_ripple.relay_available()` while retaining deprecated `trickle_available()` as a compatibility alias; change `_pg_ripple.cdc_bridge_trigger_fn()` from dynamic table inserts into pg-trickle-style outbox tables to `tide.outbox_publish(outbox_name, payload, headers)` with stable `ripple:{statement_id}` dedup metadata; add `_pg_ripple.cdc_bridge_triggers.outbox_name` while retaining `outbox_table` as a compatibility alias; update operations guides, BIDI runbooks, examples, and Docker snippets to use pg_tide's `pg-tide` command, `ghcr.io/trickle-labs/pg-tide` image, `PG_TIDE_POSTGRES_URL`, and stable `tide.relay_set_outbox_v2` / `tide.relay_set_inbox_v2` configuration APIs; bump bundled/tested pg_tide to 0.33.0; add detailed research plan `pg-tide-relay-fixes.md`; add migration script `sql/pg_ripple--0.126.0--0.127.0.sql` | ✅ Released | Medium | [Full details](roadmap/v0.127.0.md) |
 | [v0.128.0](roadmap/v0.128.0.md) | **JSON mapping relational writeback — JSON-LD reverse mapping (RDF → Relational)** — completes the `register_json_mapping` round-trip; schema: five new writeback columns on `_pg_ripple.json_mappings` + `_pg_ripple.json_writeback_queue` table; SQL API: `writeback_json_row()`, `writeback_json_row_delete()`, `enable_json_writeback()`, `disable_json_writeback()`, `json_writeback_status()`; trigger-based async queueing via VP delta triggers; `pg_ripple.json_writeback_batch_size` GUC (default 100); HTTP: `POST /json-mapping/{name}/writeback`, `GET /json-mapping/{name}/writeback/status`; 21 pg_regress tests; blog post + docs | ✅ Released | Large | [Full details](roadmap/v0.128.0.md) |
 
-### A18 Remediation & Pre-GA Hardening (v0.129.0 – v0.132.0)
+### Production Readiness & GA Qualification (v0.128.1 – v0.137.0)
+
+> **Feature freeze:** [The production-readiness plan](plans/pg-ripple-production-readiness-plan.md) replaces the compressed A18 schedule. Each milestone is evidence-gated; no new product families or experimental feature work enter the stable surface before v1.0.0.
+
+| Version | Theme | Status | Release type | Primary gate |
+|---------|-------|--------|--------------|--------------|
+| [v0.128.1](plans/pg-ripple-production-readiness-plan.md#v01281--emergency-containment-and-safe-patch) | Emergency containment and safe patch | Planned | Out-of-band patch | No startup panic, no passwordless production image, no false-enabled async writeback |
+| [v0.129.0](plans/pg-ripple-production-readiness-plan.md#v01290--json-writeback-and-mutation-integrity) | JSON writeback and mutation integrity | Planned | Correctness release | Full insert/update/delete/retry/restart writeback matrix passes |
+| [v0.130.0](plans/pg-ripple-production-readiness-plan.md#v01300--installation-and-migration-integrity) | Installation and migration integrity | Planned | Upgrade release | Fresh install and every supported upgrade path are schema- and behavior-equivalent |
+| [v0.131.0](plans/pg-ripple-production-readiness-plan.md#v01310--secure-by-default-runtime-and-packaging) | Secure-by-default runtime and packaging | Planned | Security release | Production deployments fail closed and least privilege is verified |
+| [v0.132.0](plans/pg-ripple-production-readiness-plan.md#v01320--conformance-feature-truth-and-release-evidence) | Conformance, feature truth, and release evidence | Planned | Assurance release | Required suites cannot skip; claims are artifact-backed |
+| [v0.133.0](plans/pg-ripple-production-readiness-plan.md#v01330--crash-recovery-backup-failover-and-operations) | Crash recovery, backup, failover, and operations | Planned | Resilience release | Fault-injection and recovery matrix passes |
+| [v0.134.0](plans/pg-ripple-production-readiness-plan.md#v01340--performance-and-scale-qualification) | Performance and scale qualification | Planned | Performance release | Current raw benchmarks published; regressions and unbounded paths gated |
+| [v0.135.0](plans/pg-ripple-production-readiness-plan.md#v01350--api-schema-guc-and-compatibility-freeze) | API, schema, GUC, and compatibility freeze | Planned | RC0 | Stable surface manifest frozen and breaking-change gate active |
+| [v0.136.0](plans/pg-ripple-production-readiness-plan.md#v01360--external-audit-remediation-and-hardened-candidate) | External audit remediation and hardened candidate | Planned | RC1 | External audit has no unresolved Critical or High findings |
+| [v0.137.0](plans/pg-ripple-production-readiness-plan.md#v01370--final-ga-qualification) | Final GA qualification | Planned | RC2 | Exact candidate passes 72-hour soak and two zero-High readiness assessments |
+
+<!-- Superseded A18 allocation retained below for assessment traceability.
 
 > These four versions close every Critical, High, Medium, and Low finding from [plans/PLAN_OVERALL_ASSESSMENT-18.md](plans/PLAN_OVERALL_ASSESSMENT-18.md) (v0.128.0, score 4.15/5.0) and complete the remaining pre-GA gates required for v1.0.0. v0.129.0 is the hotfix release that repairs the silently-broken async JSON writeback feature (C18-01) and the direct writeback row-count and type-cast correctness issues (H18-02). v0.130.0 decomposes the new `json_mapping.rs` monolith (H18-03), hardens the migration-chain test to cover all 131 migration scripts (H18-01), and replaces bare-catalog-update writeback configuration with a validated public API (M18-07). v0.131.0 hardens all security and CI findings: HTTP companion fail-closed auth default (M18-01), temporal RDF serializer escaping (M18-02), conformance CI truth (M18-05), compatibility-matrix refresh (M18-06), raw-secret GUC rejection (M18-08), trust-proxy wiring (L18-01), and version-stamped conformance artifacts (L18-03). v0.132.0 delivers the two performance findings (M18-03, M18-04), publishes the 72-hour soak-test artifact, and formally launches the external security audit engagement, clearing all remaining GA Entry Criteria blockers.
 
@@ -308,19 +325,23 @@
 | [v0.131.0](roadmap/v0.131.0.md) | **A18 Security Hardening, Conformance CI Truth & Documentation Refresh** — **(M18-01 / HTTP-FAIL-CLOSED)** change `check_token()` in `pg_ripple_http/src/common.rs` to return HTTP 401 when no auth token is configured unless `PG_RIPPLE_HTTP_ALLOW_UNAUTHENTICATED=1` is explicitly set; add a startup `tracing::warn!` message when running unauthenticated; update Docker Compose examples, Helm chart values, and `docs/src/operations/http-companion.md` to require an `AUTH_TOKEN` secret or explicit opt-out; update `pg_ripple_http/README.md` Auth Token section; **(M18-02 / RDF-TERM-ESCAPING)** replace `format!("<{s}>")` / `format!("\"{s}\"")` manual Turtle/N-Quads emission in `pg_ripple_http/src/routing/temporal_handlers.rs` with calls to the shared export serializer (`rio_api` `TurtleFormatter` / `NQuadsFormatter`); add a `fn format_nquads_term()` helper in `pg_ripple_http/src/common.rs` handling blank nodes (`_:…` detection), typed literals (`^^<…>`), language-tagged literals, and special-character escaping per N-Quads spec §4; add HTTP integration tests for snapshot and diff endpoints covering: (1) IRI with angle brackets, (2) literal with inner quotes, (3) literal with newline, (4) blank-node subject, (5) typed literal `^^xsd:integer`; **(M18-05 / CONFORMANCE-CI)** make W3C smoke-suite and Jena blocking-job data-fetch steps fatal (`set -e`; remove `|| echo "…tests will skip"` fallback); for informational jobs retain skip-on-missing-data but rename step to "Download test data (informational — skip on failure)"; set `OWL2RL_REQUIRE=1` in the OWL 2 RL job environment if pass rate ≥ 95% (validate current pass rate; if below 95% rename the job to "OWL 2 RL (informational)" and remove the `continue-on-error: false` mislabel); upload a `conformance-skip.txt` artifact when any informational data fetch fails; **(M18-06 / COMPAT-MATRIX-REFRESH)** add rows for `0.124.x`–`0.128.x` to `docs/src/operations/compatibility.md` each with companion version, minimum extension version, and breaking API notes; correct `pg_ripple_http/README.md` default values to match code (rate limit 100, CORS empty, auth required by default); add link to `docs/src/reference/http-api.md` as canonical endpoint reference; **(M18-08 / SECRET-GUC-REJECTION)** convert `pg_ripple.llm_api_key_env` assign hook to a check hook that rejects values not matching `^[A-Z_][A-Z0-9_]*$` with error message `"llm_api_key_env must be an environment-variable name (e.g. MY_KEY_ENV), not a raw key value"`; add `pg_ripple.llm_api_key_env_allow_raw = off` GUC escape hatch (Superuser only) for pre-0.131 raw-key migration; update GUC description string and `docs/src/reference/gucs.md`; **(L18-01 / TRUST-PROXY-WIRING)** implement `PG_RIPPLE_HTTP_TRUST_PROXY` as a comma-separated CIDR list parsed at startup; add a `TrustedProxyLayer` Tower middleware in `pg_ripple_http/src/routing/middleware.rs` that extracts `X-Forwarded-For` only when the direct client IP is within the trusted-proxy list and replaces `ConnectInfo` for downstream rate-limit and audit decisions; validate CIDRs at startup and fail with a clear config error on invalid input; add middleware tests for trusted-proxy rewrite, untrusted-proxy bypass, and invalid-CIDR rejection; **(L18-03 / CONFORMANCE-ARTIFACTS)** update CI conformance jobs to write `version` and `generated_at` fields into all conformance report JSON artifacts; add `scripts/publish_conformance.sh` that copies run artifacts into `results/conformance/<version>/` and updates `results/conformance/latest` symlink; label existing stale artifacts under `w3c_report/`, `jena_report/`, `watdiv_report/` with `"note": "historical artifact from version 0.43.0"`; add migration script `sql/pg_ripple--0.130.0--0.131.0.sql` (no schema changes) | Planned | Large | [Full details](roadmap/v0.131.0.md) |
 | [v0.132.0](roadmap/v0.132.0.md) | **A18 Performance, Scale & External Audit Preparation** — **(M18-03 / UNBOUNDED-UNION)** bound variable-predicate SPARQL query expansion in `src/sparql/sqlgen.rs build_all_predicates_union()`: add `pg_ripple.max_predicate_union_branches` GUC (default 500, min 10, max 10000) that caps the number of VP table UNION branches generated; when the predicate catalog exceeds the cap emit `PT0601 ERROR: variable-predicate query would require N UNION branches (max M); use a named predicate or increase pg_ripple.max_predicate_union_branches`; investigate and implement a late-binding execution strategy as an alternative: generate a catalog-driven CTE or partitioned-parent-table scan that avoids baking one branch per predicate into the SQL text; if viable, activate for catalogs above 200 predicates and fall back to UNION expansion below; add planner-regression benchmark `benchmarks/variable_predicate_scale.sql` timing planning + execution for 100, 500, 1000, and 5000-predicate catalogs with a 2× planning-time regression gate from 100 to 1000 predicates; **(M18-04 / KEYSET-PAGINATION)** replace OFFSET-based pagination in `src/storage/ops/scan.rs for_each_encoded_triple_batch()` with keyset pagination: track the last statement-id `i` seen per VP table and `vp_rare` and query `WHERE i > $last_i ORDER BY i LIMIT $batch_size`; ensure `_pg_ripple.vp_rare` has a B-tree index on `(i)` (add to `src/schema/tables.rs` and migration); ensure VP delta table creation adds `CREATE INDEX … ON vp_{id}_delta (i)`; add `CREATE INDEX … ON vp_{id}_main (i)` in the merge worker after each main rebuild; add benchmark `benchmarks/export_keyset_vs_offset.sql` comparing full-graph export throughput for a 10M-triple fixture with a ≤ 2× regression gate; **(H18-04 / SOAK-TEST)** add `benchmarks/soak_72h.sh` script running `bench-bsbm-100m` + WatDiv continuously for 72 hours, collecting per-epoch memory RSS, merge-latency p50/p95/p99, query throughput (QPS), merge-worker queue depth, Prometheus error-rate counter, and PostgreSQL heap/index bloat; publish results artifact to `docs/src/benchmarks/soak-<version>.md`; add `results/soak/latest.md` symlink; gate v0.132.0 release on at least one successful soak run completing with error rate < 0.01% and memory growth < 10% over the 72-hour window; **(H18-04 / EXTERNAL-AUDIT)** open tracked GitHub issue `External Security Audit — v1.0.0 Gate` with scope (all `src/`, `pg_ripple_http/src/`, SQL migration scripts, Helm chart, Docker images), candidate auditors (TrailOfBits, Cure53, NCC Group), proposed timeline (audit begins ≤ 4 weeks after v0.132.0 tag, report due ≤ 8 weeks after that), and a deliverables checklist (raw findings, remediation confirmation, public summary); add `docs/src/security.md` section "Planned v1.0.0 External Audit" with scope and engagement status; commit `audit/engagement-brief.md` documenting scope, methodology requirements (OWASP ASVS level 2, PostgreSQL extension attack surface, SSRF, injection, auth bypass, privilege escalation), and expected deliverables; add migration script `sql/pg_ripple--0.131.0--0.132.0.sql` (adds B-tree index on `_pg_ripple.vp_rare (i)` if not already present; records soak-test baseline comment) | Planned | Large | [Full details](roadmap/v0.132.0.md) |
 
-## v1.0.0 GA Entry Criteria (H16-07, v0.112.0)
+-->
+
+## v1.0.0 GA Entry Criteria
 
 pg_ripple enters general availability (v1.0.0) only when **all** of the following criteria are met.
 Each criterion has a corresponding CI gate or documented evidence requirement.
 
 | # | Criterion | Gate / Evidence |
 |---|-----------|-----------------|
-| **(a)** | Zero open High-severity findings for **two consecutive** assessment cycles | Assessment report on file with no unresolved High findings in the current and previous cycle |
-| **(b)** | Zero unannotated `unsafe` blocks in the codebase | `clippy::undocumented_unsafe_blocks = "deny"` enforced in `Cargo.toml`; CI fails on any unannotated `unsafe {}` |
-| **(c)** | HTTP companion compatibility window policy **written and enforced by CI** | `RELEASE.md` "HTTP Companion Compatibility Window Policy" section; `release.yml` `compat-check` job fails if floor > 1 minor version behind |
-| **(d)** | All pg_regress tests passing on PG18 | `cargo pgrx regress pg18` reports ≥ 271 tests, 0 failures in the `release.yml` CI run |
-| **(e)** | Signed SBOM | `pg_ripple.cdx.json` SBOM signed with `cosign` and attached to the GitHub release artifact |
-| **(f)** | External security-review report on file | TrailOfBits, Cure53, or equivalent third-party audit completed; report linked from the GitHub release and `docs/src/security.md` |
+| **(a)** | Correctness and mutation integrity | No open Critical or High correctness defects; randomized mutation and stable-feature end-to-end suites pass |
+| **(b)** | Installation and upgrade integrity | Fresh installs and every supported artifact upgrade are schema- and behavior-equivalent |
+| **(c)** | Secure defaults and least privilege | Public deployments fail closed; container auth, route authorization, database TLS, and least-privilege tests pass |
+| **(d)** | Conformance and product truth | Required suites cannot skip or run zero tests; public stable claims are backed by signed artifact evidence |
+| **(e)** | Resilience and recoverability | Crash, restart, backup, restore, PITR, replica promotion, and resource-pressure qualification passes |
+| **(f)** | Performance qualification | Current raw benchmarks are published; regressions, memory use, and pathological query paths remain within accepted bounds |
+| **(g)** | Compatibility freeze | Stable SQL, HTTP, GUC, schema, error, and sidecar contracts are captured in a CI-enforced manifest |
+| **(h)** | Independent assurance and final qualification | External audit has no unresolved Critical or High findings; the exact candidate passes the 72-hour workload and two consecutive zero-High readiness assessments |
 
 Progress against these criteria is tracked in each assessment report and confirmed before tagging v1.0.0.
 
@@ -328,7 +349,7 @@ Progress against these criteria is tracked in each assessment report and confirm
 
 | Version | Theme | Status | Scope | Full details |
 |---------|-------|--------|-------|-------------- |
-| [v1.0.0](roadmap/v1.0.0-full.md) | **Production hardening & GA release** — satisfies all GA Entry Criteria (H16-07 / ROAD-15-01): **(a)** zero open High findings for two consecutive assessments (A17 remediation arc closes H17-01 and H17-02; A18 remediation arc v0.129.0–v0.132.0 closes C18-01, H18-01 through H18-04, and all medium/low findings; A19 confirms zero open Highs); **(b)** zero unannotated `unsafe` blocks (enforced by `clippy::undocumented_unsafe_blocks = "deny"` in CI); **(c)** HTTP companion compatibility window policy written and enforced by `release.yml` CI gate; **(d)** all 310+ pg_regress tests passing on PG18 (including v0.121.0–v0.132.0 tests and the six new writeback correctness tests from v0.129.0); **(e)** `pg_ripple.cdx.json` SBOM signed with `cosign` and published to the GitHub release page; **(f)** external third-party security audit report on file (TrailOfBits/Cure53 or equivalent — engagement opened in v0.132.0, report due before v1.0.0 tag); plus: 72-hour continuous load test (`bench-bsbm-100m` + WatDiv) with results published to `docs/src/benchmarks/` (first soak run completed in v0.132.0); API stability matrix for every `#[pg_extern]` and GUC auto-generated from `cargo doc` JSON and committed to `docs/src/reference/api-stability.md`; documentation final audit and freeze; `pg_ripple.bench_workload()` baseline results for BSBM/WatDiv/PageRank published | Planned | Medium | [Full details](roadmap/v1.0.0-full.md) |
+| [v1.0.0](plans/pg-ripple-production-readiness-plan.md#v100--general-availability) | **General Availability** — promote the exact v0.137.0 candidate without behavior changes after correctness, migration, security, conformance, resilience, performance, compatibility, external-audit, and 72-hour qualification gates pass; publish immutable artifacts, provenance, signed SBOMs, support policies, and the complete release-evidence bundle | Planned | Medium | [Full details](plans/pg-ripple-production-readiness-plan.md#v100--general-availability) |
 | [v1.1.0](roadmap/v1.1.0.md) | **Post-GA ecosystem & performance** — Cypher/GQL read-only transpiler (`MATCH … RETURN`) + write operations (`CREATE`/`SET`/`DELETE`) enabling graph-database users to query pg_ripple without learning SPARQL; Jupyter SPARQL kernel for interactive notebook exploration; LangChain/LlamaIndex tool packages for LLM orchestration workflows; Kafka CDC sink for event-driven knowledge graph updates; materialized SPARQL views with configurable refresh; dbt adapter; SPARQL endpoint FDW; pgai in-database embedding generation; logical replication for pg_ripple knowledge graphs across instances; **(FEAT-04 / PERF-M-01)** true `COPY FROM STDIN WITH (FORMAT binary)` bulk load path via `pgrx::copy_in` API eliminating parse/plan overhead for 100M+ triple loads (2–3× improvement over UNNEST-array path activated in v0.113.0); **(FEAT-07)** SPARQL federation mTLS client-certificate support and JWKS-endpoint-backed JWT verification for enterprise SPARQL endpoints requiring mutual TLS — extends the OAuth2/API-key credentials from v0.126.0 | Planned | Large | [Full details](roadmap/v1.1.0-full.md) |
 | [v1.2.0](roadmap/v1.2.0.md) | **Custom IndexAM & declarative partitioning** — **(WC-01)** native PostgreSQL index access method for `(s, p, o, g)` quad patterns enabling parallel index-only scans for SPARQL BGPs and 2–5× faster large-graph scans; **(WC-03)** declarative VP table partitioning: `PARTITION BY LIST (g)` for large multi-tenant deployments with per-tenant partition pruning; **(FEAT-09)** Knowledge Graph Diff/Delta Export: `pg_ripple.kg_diff(graph_iri, from_version, to_version) → TABLE` and `GET /graphs/{iri}/delta?from=&to=` HTTP endpoint exporting added/removed quads as N-Quads or JSON-LD patches for external consumers (event sourcing, CDC, audit compliance); **(FEAT-07 extended)** SPARQL endpoint federation JWKS endpoint for RS256/ES256 JWT verification — completes the enterprise auth story from v1.1.0 | Planned | Very Large | [Full details](roadmap/v1.2.0-full.md) |
 | [v1.3.0](roadmap/v1.3.0.md) | **OWL 2 EL/QL profiles, columnar cold-tier storage, and GNN integration** — **(FEAT-05)** OWL 2 EL profile full rule-set in Datalog: OWL 2 EL is widely used in biomedical ontologies (SNOMED CT, Gene Ontology, NCIt) and has tractable reasoning; implement the normative rule tables for EL (`cls-oo`, `prp-ap`, `cax-sco`, `scm-cls`, `scm-op`, `scm-dp` and EL-specific rules) with a dedicated fixpoint strategy optimised for the EL complexity class; add OWL 2 QL profile targeting large ABox instances with efficient first-order-rewritable queries; extend `_pg_ripple.owl_profiles` catalog with `'EL'` and `'QL'` entries; add 50 OWL 2 EL pg_regress tests using SNOMED-subset fixture; **(FEAT-06)** columnar cold-tier storage via Parquet — VP tables with billions of triples exceeding the HTAP hot-tier threshold can be archived to a Parquet cold tier using `pg_parquet` FDW or DuckDB FDW; `pg_ripple.tier_threshold_triples` GUC (default 100M) controls automatic cold-tiering; SPARQL query router transparently unions hot VP table with cold Parquet scan; 5–20× storage compression and 5–20× scan throughput improvement for analytical SPARQL; **(FEAT-08)** Graph Neural Network integration — in-database GNN training bridge: `pg_ripple.gnn_encode(model_name TEXT, graph_iri TEXT) → TABLE(entity BIGINT, embedding FLOAT4[])` exporting entity embeddings from a trained PyG/DGL model via a Python extension bridge; `pg_ripple.gnn_predict_links(model_name TEXT, subject BIGINT, k INT) → TABLE(object BIGINT, score FLOAT4)` for link prediction queries over trained embeddings, replacing the TransE/RotatE-only approach from v0.57.0 with full GNN model support; requires `pg_python` or `plpython3u` bridge | Planned | Very Large | [Full details](roadmap/v1.3.0.md) |
@@ -652,43 +673,38 @@ v0.128.0       ─── JSON mapping relational writeback: RDF → relational r
                │   json_writeback_queue + background drain; HTTP POST /writeback;
                │   json_writeback_batch_size GUC; 20 pg_regress tests; blog post
        │
-v0.129.0       ─── A18 critical/high correctness hotfix: fix async JSON writeback
-               │   (C18-01: dictionary column bug `iri` → `value`; migration adds
-               │   json_writeback_enqueue_fn(); enqueue coverage for vp_rare,
-               │   vp_{id}_tombstones, newly promoted predicates); direct writeback
-               │   row-count semantics via RETURNING (H18-02); typed-param casting
-               │   from pg_attribute (H18-02); key-validation and placeholder fix;
-               │   queue-drain SPI error logging + retry_count (L18-02); 6 new
-               │   pg_regress tests; blog post
+v0.128.1       ─── Emergency containment: HTTP startup, production database auth,
+               │   and async writeback fail-closed patch
        │
-v0.130.0       ─── A18 architecture: json_mapping.rs (1,245 LOC) split into 7
-               │   sub-modules registry/ingest/export/writeback/queue/triggers/mod
-               │   (H18-03); migration-chain test rewritten to apply all 131 scripts
-               │   through default_version with real schema assertions (H18-01);
-               │   configure_json_writeback() + writeback_inspect() public API (M18-07);
-               │   maintenance_api + datalog parser/compiler decomposed; CI LOC gate
-               │   (soft 800 / hard 1200 LOC per file)
+v0.129.0       ─── JSON writeback and mutation integrity: transactional event path,
+               │   correct target SQL, restart-safe queue, and acceptance matrix
        │
-v0.131.0       ─── A18 security & CI: HTTP companion fail-closed auth default —
-               │   401 unless PG_RIPPLE_HTTP_ALLOW_UNAUTHENTICATED=1 (M18-01);
-               │   temporal RDF serializers use rio_api escaping (M18-02); conformance
-               │   CI fetch-failure fatal for required jobs (M18-05); compat matrix
-               │   rows 0.124.x–0.128.x + README defaults corrected (M18-06);
-               │   llm_api_key_env check-hook rejects raw secrets (M18-08);
-               │   TRUST_PROXY CIDR middleware wired (L18-01); conformance artifacts
-               │   version-stamped + publish_conformance.sh (L18-03)
+v0.130.0       ─── Installation and migration integrity: independent migration graph,
+               │   schema fingerprints, artifact install matrix, and upgrade recovery
        │
-v0.132.0       ─── A18 performance & GA prep: variable-predicate UNION bounded by
-               │   max_predicate_union_branches GUC + late-binding CTE investigation
-               │   (M18-03); batch scan keyset pagination replaces OFFSET (M18-04);
-               │   72-hour soak-test script + first published soak artifact (H18-04);
-               │   external security audit engagement opened (scope, auditor, timeline)
-               │   + audit/engagement-brief.md (H18-04)
+v0.131.0       ─── Secure-by-default runtime and packaging: typed configuration,
+               │   route access registry, TLS, least privilege, and pinned supply chain
        │
-v1.0.0         ─── Stable release: all GA Entry Criteria met (zero open Highs ×2
-               │   assessments; zero unannotated unsafe; compat CI gate; signed SBOM;
-               │   external security audit); 72-hour continuous load test;
-               │   API stability matrix; documentation freeze; benchmark results published
+v0.132.0       ─── Conformance and product truth: pinned corpora, non-skippable gates,
+               │   feature evidence, route/OpenAPI truth, and signed evidence bundle
+       │
+v0.133.0       ─── Resilience qualification: fault injection, crash recovery,
+               │   backup/restore/PITR, failover, resource pressure, and runbooks
+       │
+v0.134.0       ─── Performance qualification: bounded pathological paths, current
+               │   reproducible benchmarks, scale tiers, and regression gates
+       │
+v0.135.0       ─── RC0 compatibility freeze: public schema decision and stable SQL,
+               │   HTTP, GUC, catalog, error, and feature-surface manifests
+       │
+v0.136.0       ─── RC1 external-audit remediation: frozen artifacts assessed,
+               │   all Critical and High findings closed with regression tests
+       │
+v0.137.0       ─── RC2 final qualification: exact signed candidate passes the
+               │   72-hour mixed workload and two zero-High readiness assessments
+       │
+v1.0.0         ─── General Availability: promote the qualified candidate unchanged;
+               │   publish immutable artifacts and the complete evidence bundle
        │
 v1.1           ─── Post-stable ecosystem & performance: Cypher/GQL transpiler
                │   (read-only + write ops), Jupyter kernel, LangChain/LlamaIndex
@@ -931,6 +947,15 @@ v0.126.0 adds per-endpoint federation credentials with OAuth2 Bearer and API-key
 stored via pgcrypto encryption, injected at query time into reqwest federation calls —
 making pg_ripple the first PostgreSQL-native RDF store with cryptographically protected
 federation credential management.
+v0.127.0 completes the pg_tide relay migration, and v0.128.0 completes JSON mapping
+relational writeback. The feature freeze then begins: v0.128.1 contains release-breaking
+HTTP, container-auth, and writeback behavior; v0.129.0 establishes mutation integrity;
+v0.130.0 qualifies installation and upgrades; v0.131.0 makes runtime and packaging secure
+by default; v0.132.0 makes conformance and feature claims artifact-backed; v0.133.0 proves
+crash recovery, backup, and failover; v0.134.0 qualifies performance and scale; v0.135.0
+freezes the stable API and compatibility surface; v0.136.0 closes external-audit findings;
+and v0.137.0 qualifies one exact candidate under the 72-hour mixed workload. v1.0.0
+promotes that candidate unchanged and publishes the complete signed evidence bundle.
 v1.1.0 delivers post-stable improvements: Cypher/GQL transpiler (read-only and write
 operations), Jupyter SPARQL kernel, LangChain/LlamaIndex tool packages, Kafka CDC sink,
 materialized SPARQL views, a dbt adapter, a SPARQL endpoint FDW, pgai in-database
