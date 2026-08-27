@@ -49,9 +49,16 @@ docker run --rm -d \
   "${IMAGE_TAG}" >/dev/null
 
 echo -n "==> Waiting for PostgreSQL to accept connections..."
+# The official postgres entrypoint briefly starts a *temporary* bootstrap
+# server (to run init scripts like docker/00-pg_hba.sh) before stopping it
+# and starting the real one. `pg_isready` happily reports that temporary
+# server as ready, so gating on it races: checks below can land in the
+# restart gap and fail regardless of real auth behavior. Gate on the actual
+# end state we test for — an authenticated connection succeeding — instead.
 READY=0
 for _ in $(seq 1 60); do
-  if docker exec "${CONTAINER_NAME}" pg_isready -U postgres >/dev/null 2>&1; then
+  if PGPASSWORD="${PG_PASSWORD}" psql "host=127.0.0.1 port=${HOST_PORT} user=postgres dbname=postgres sslmode=disable connect_timeout=2" \
+       -c "SELECT 1" >/dev/null 2>&1; then
     READY=1
     break
   fi

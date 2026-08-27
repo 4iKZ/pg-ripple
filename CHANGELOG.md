@@ -73,6 +73,12 @@ for the full remediation plan.**
   `.versions.toml` into the build context, so `build.rs` panicked with
   `cannot read .versions.toml: No such file or directory`. The main
   `Dockerfile` already copied this file; `Dockerfile.cnpg` now does too.
+- **CI: `tests/container/test_pg_hba.sh` startup race** — The readiness
+  gate polled `pg_isready`, which reports the official postgres entrypoint's
+  *temporary* bootstrap server (used to run `docker/00-pg_hba.sh`) as ready
+  before it restarts into the real server. The SCRAM-auth and local-socket
+  checks could land in that restart gap and fail spuriously. Now gates on an
+  actual authenticated connection succeeding instead.
 
 ### Technical Details
 
