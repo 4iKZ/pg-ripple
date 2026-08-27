@@ -20,7 +20,7 @@
 FROM rust:1-bookworm AS builder
 
 ARG PGRX_VERSION=0.18.0
-ARG PGVECTOR_VERSION=0.7.4
+ARG PGVECTOR_VERSION=0.8.2
 
 RUN apt-get update -qq \
     && apt-get install -y --no-install-recommends gnupg curl ca-certificates \
