@@ -6,7 +6,7 @@ CANDIDATE_ARCHIVE="${1:?usage: package_upgrade_matrix.sh CANDIDATE_ARCHIVE RECEN
 RECENT_DIR="${2:?usage: package_upgrade_matrix.sh CANDIDATE_ARCHIVE RECENT_ARCHIVES_DIR}"
 PGHOST="${PGHOST:-${PGRX_HOST:-${HOME}/.pgrx}}"
 PGPORT="${PGPORT:-${PGRX_PORT:-28818}}"
-PGUSER="${PGUSER:-${PGRX_USER:-$(whoami)}}"
+PGUSER="$(whoami)"
 PSQL=(psql -X -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER")
 PG_CONFIG="${PG_CONFIG:-$(cargo pgrx info path pg18)/bin/pg_config}"
 PG_SHARE="$($PG_CONFIG --sharedir)"

@@ -110,6 +110,10 @@ runs:
           postgresql-18 \
           postgresql-server-dev-18 >/dev/null
 
+        sudo chown -R "$USER" \
+          /usr/share/postgresql/18/extension \
+          /usr/lib/postgresql/18/lib
+
         echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
 
     # ── PostgreSQL 18 (macOS) ─────────────────────────────────────────────

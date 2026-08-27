@@ -8,7 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/pg-ripple-package.XXXXXX")"
 PGHOST="${PGHOST:-${PGRX_HOST:-${HOME}/.pgrx}}"
 PGPORT="${PGPORT:-${PGRX_PORT:-28818}}"
-PGUSER="${PGUSER:-${PGRX_USER:-$(whoami)}}"
+PGUSER="$(whoami)"
 PSQL=(psql -X -v ON_ERROR_STOP=1 -h "$PGHOST" -p "$PGPORT" -U "$PGUSER")
 
 cleanup() {
