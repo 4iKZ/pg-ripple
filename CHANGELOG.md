@@ -68,6 +68,11 @@ for the full remediation plan.**
   ghcr.io/trickle-labs/pg-ripple:<version>-cnpg` to fail with "not found". Now
   the extension image is published automatically alongside the main extension
   and HTTP companion images.
+- **CI: `docker/Dockerfile.cnpg` build failure** — The new `docker-cnpg` job
+  (above) failed on its first run: the build stage never copied
+  `.versions.toml` into the build context, so `build.rs` panicked with
+  `cannot read .versions.toml: No such file or directory`. The main
+  `Dockerfile` already copied this file; `Dockerfile.cnpg` now does too.
 
 ### Technical Details
 
