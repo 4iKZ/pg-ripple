@@ -125,6 +125,7 @@
 - [Troubleshooting](operations/troubleshooting.md)
 - [Security](operations/security.md)
 - [Compatibility Matrix](operations/compatibility.md)
+- [HTTP Companion Operations](operations/http-companion.md)
 
 ---
 
@@ -170,6 +171,7 @@
 - [Architecture (Internals)](reference/architecture.md)
 - [Subsystem Dependency Graph](architecture.md)
 - [GUC Reference](reference/guc-reference.md)
+- [GUCs](reference/gucs.md)
 - [Deprecated GUCs](reference/deprecated-gucs.md)
 - [Feature Status Taxonomy](reference/feature-status-taxonomy.md)
 - [Plan Cache](reference/plan-cache.md)

@@ -74,14 +74,12 @@ fetch_w3c() {
 
 JENA_TEST_DIR="${JENA_TEST_DIR:-${PROJECT_ROOT}/tests/jena/data}"
 
-# Apache Jena test suite is hosted on the Apache GitHub mirror.
-# The SPARQL test resources are under jena-arq/testing/ARQ (not src/test/resources).
-JENA_URL="https://github.com/apache/jena/archive/refs/heads/main.tar.gz"
-JENA_SPARQL_PATH="jena-main/jena-arq/testing/ARQ"
+# Pin the fixture snapshot consumed by the harness.
+JENA_URL="https://raw.githubusercontent.com/apache/jena/790b3dc08fccb6be1ea2868b97bfcbae8f113062/jena-arq/testing/ARQ/testing-2026-05.zip"
 
 # SHA-256 checksum of the Jena archive.
-# NOTE: This changes with each Jena HEAD commit; set JENA_SKIP_CHECKSUM=1 to skip.
-JENA_SHA256="${JENA_SHA256:-}"
+# Set JENA_SKIP_CHECKSUM=1 to skip verification when testing a new snapshot.
+JENA_SHA256="${JENA_SHA256:-cfe989a8429ca57e6a737ccc094c761ec57737ef06ed7a749257a3ad7d0f7f3e}"
 
 fetch_jena() {
     if [[ -d "${JENA_TEST_DIR}" && "${FORCE}" != "--force" ]]; then
@@ -94,10 +92,11 @@ fetch_jena() {
 
     info "Downloading Apache Jena test suite from GitHub..."
     info "URL: ${JENA_URL}"
-    info "This will extract the SPARQL test resources (~50 MB)."
+    info "This will extract the SPARQL test resources (~4 MB)."
 
-    local archive="/tmp/jena-tests-$$.tar.gz"
-    trap "rm -f '${archive}'" EXIT
+    local archive="/tmp/jena-tests-$$.zip"
+    local extract_dir="/tmp/jena-tests-extract-$$"
+    trap "rm -rf '${extract_dir}' '${archive}'" EXIT
 
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL --retry 3 --retry-delay 5 "${JENA_URL}" -o "${archive}" \
@@ -129,13 +128,15 @@ fetch_jena() {
         info "Set JENA_SHA256 or JENA_SKIP_CHECKSUM=1 to skip verification."
     fi
 
+    if ! command -v unzip >/dev/null 2>&1; then
+        fail "unzip is not available."
+    fi
+
     info "Extracting SPARQL test resources..."
-    mkdir -p "${JENA_TEST_DIR}"
-    tar -xzf "${archive}" \
-        --strip-components=3 \
-        -C "${JENA_TEST_DIR}" \
-        "${JENA_SPARQL_PATH}" \
-        2>/dev/null || true   # Some paths may not exist in all Jena versions.
+    mkdir -p "${JENA_TEST_DIR}" "${extract_dir}"
+    unzip -q "${archive}" -d "${extract_dir}"
+    mkdir -p "${JENA_TEST_DIR}/ARQ"
+    cp -R "${extract_dir}/testing/ARQ/." "${JENA_TEST_DIR}/ARQ/"
 
     # Create sub-suite directories expected by the test harness.
     for suite in sparql-query sparql-update sparql-syntax algebra; do
@@ -152,9 +153,7 @@ fetch_jena() {
     if find "${JENA_TEST_DIR}" -name "manifest.ttl" 2>/dev/null | grep -q .; then
         ok "Jena test data extracted to ${JENA_TEST_DIR}"
     else
-        info "WARNING: No manifest.ttl files found after extraction."
-        info "Jena may have changed its repository layout."
-        info "Set JENA_TEST_DIR to a directory containing SPARQL test manifests."
+        fail "No manifest.ttl files found after extracting Jena test data."
     fi
 }
 
