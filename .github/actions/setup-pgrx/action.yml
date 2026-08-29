@@ -145,7 +145,14 @@ runs:
       shell: bash
       run: |
         if [ "${{ runner.os }}" = "Windows" ]; then
-          cargo pgrx init --pg18 download
+          for attempt in 1 2 3; do
+            if cargo pgrx init --pg18 download; then
+              exit 0
+            fi
+            echo "pgrx init failed (attempt ${attempt}/3); retrying..."
+            sleep 10
+          done
+          exit 1
         else
           PG_CONFIG_PATH="$(which pg_config)"
           echo "Using pg_config: ${PG_CONFIG_PATH}"
