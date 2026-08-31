@@ -521,13 +521,12 @@ jobs:
       - name: Install pg_ripple
         run: cargo pgrx install --pg-config /usr/lib/postgresql/18/bin/pg_config
 
-      - name: Run W3C full suite (8 threads)
+      - name: Run W3C full suite
         env:
           PGHOST: localhost
           PGPORT: "28818"
           PGDATABASE: postgres
           PGUSER: runner
-          W3C_THREADS: "8"
           REQUIRE_CONFORMANCE: "1"
         run: cargo test --test w3c_suite -- --nocapture
 
