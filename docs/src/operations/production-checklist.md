@@ -53,6 +53,8 @@ uses a disposable PostgreSQL 18 instance and reuses the established
 crash-recovery tests. It is deterministic, bounded, and stops on the first
 failure.
 
+The named resilience job runs only the static `--validate` checks below. The migration qualification job also performs a live interrupted-upgrade rollback, postmaster `SIGKILL` and restart, logical restore, physical base-backup restore, and bounded resource-pressure run. It uploads raw logs and environment details for 90 days. PITR, HA promotion, and the remaining crash scenarios are still operator-run procedures and are not release evidence unless their artifacts are retained.
+
 ```bash
 # CI-safe: no PostgreSQL connection, cluster, or external mutation required.
 bash tests/resilience/fault_matrix.sh --validate

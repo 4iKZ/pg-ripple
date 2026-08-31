@@ -1,4 +1,4 @@
-//! W3C SPARQL 1.1 full conformance suite — ~3 000 tests across 13 sub-suites.
+//! Locked W3C SPARQL 1.1 suite: 324 cases across 12 sub-suites.
 //!
 //! Sub-suites: aggregates, bind, exists, functions, grouping, negation,
 //! project-expression, property-path, service, subquery, syntax-query,

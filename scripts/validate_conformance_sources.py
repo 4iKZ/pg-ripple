@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -80,6 +81,17 @@ def check_bounds(suite: str, label: str, value: int, bounds: dict) -> None:
 def validate_shape(suite: str, source: dict, directory: Path) -> None:
     if not directory.is_dir():
         fail(f"{suite}: corpus directory does not exist: {directory}")
+
+    if source["kind"] == "owl2rl":
+        corpus = directory / "all.rdf"
+        try:
+            root = ET.parse(corpus).getroot()
+        except (OSError, ET.ParseError) as exc:
+            fail(f"{suite}: cannot read pinned RDF/XML corpus {corpus}: {exc}")
+        namespace = "{http://www.w3.org/2007/OWL/testOntology#}"
+        test_count = len(root.findall(f".//{namespace}identifier"))
+        check_bounds(suite, "test", test_count, source["expected_test_count"])
+        return
 
     manifests = (
         list(directory.rglob("manifest.ttl"))

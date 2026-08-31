@@ -32,8 +32,9 @@ WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/pg-ripple-physical.XXXXXX")"
 BASE_DIR="$WORKDIR/base"
 RESTORE_DIR="$WORKDIR/restore"
 PITR_DIR="$WORKDIR/pitr"
-RESTORE_SOCKET="$WORKDIR/restore-socket"
-PITR_SOCKET="$WORKDIR/pitr-socket"
+SOCKET_DIR="$(mktemp -d /tmp/pg-ripple-sock.XXXXXX)"
+RESTORE_SOCKET="$SOCKET_DIR"
+PITR_SOCKET="$SOCKET_DIR"
 RESTORE_PORT="${PG_RIPPLE_RESTORE_PORT:-55433}"
 PITR_PORT="${PG_RIPPLE_PITR_PORT:-55434}"
 SOURCE_READY=0
@@ -72,6 +73,10 @@ cleanup() {
         echo "CLEANUP: failed to remove ${WORKDIR}" >&2
         cleanup_status=1
     fi
+    if ! resilience_cleanup_tempdir "$SOCKET_DIR"; then
+        echo "CLEANUP: failed to remove ${SOCKET_DIR}" >&2
+        cleanup_status=1
+    fi
 }
 
 finish() {
@@ -104,8 +109,11 @@ BASEBACKUP=(pg_basebackup -D "$BASE_DIR" -Fp -X stream -c fast -P)
 
 "${PSQL[@]}" -c "UPDATE public.${MARKER} SET value = 'after-backup';" >/dev/null
 mkdir -p "$RESTORE_SOCKET"
-"$PGCTL" start -D "$BASE_DIR" -o "-p ${RESTORE_PORT} -k ${RESTORE_SOCKET}" \
-    -l "$WORKDIR/restore.log" -w -t 60 >/dev/null
+if ! "$PGCTL" start -D "$BASE_DIR" -o "-p ${RESTORE_PORT} -k ${RESTORE_SOCKET}" \
+    -l "$WORKDIR/restore.log" -w -t 60 >/dev/null; then
+    cat "$WORKDIR/restore.log" >&2
+    resilience_die "restored cluster did not start"
+fi
 RESTORE_DIR="$BASE_DIR"
 
 RESTORE_PSQL=(psql -X -v ON_ERROR_STOP=1 -h "$RESTORE_SOCKET" -p "$RESTORE_PORT" -d "$SOURCE_DB")
@@ -147,8 +155,11 @@ if [[ "${PG_RIPPLE_RUN_PITR:-0}" == "1" ]]; then
         "$ARCHIVE_DIR" "$PITR_TARGET" > "$PITR_DIR/postgresql.auto.conf"
     touch "$PITR_DIR/recovery.signal"
     mkdir -p "$PITR_SOCKET"
-    "$PGCTL" start -D "$PITR_DIR" -o "-p ${PITR_PORT} -k ${PITR_SOCKET}" \
-        -l "$WORKDIR/pitr.log" -w -t 120 >/dev/null
+    if ! "$PGCTL" start -D "$PITR_DIR" -o "-p ${PITR_PORT} -k ${PITR_SOCKET}" \
+        -l "$WORKDIR/pitr.log" -w -t 120 >/dev/null; then
+        cat "$WORKDIR/pitr.log" >&2
+        resilience_die "PITR cluster did not start"
+    fi
     PITR_PSQL=(psql -X -v ON_ERROR_STOP=1 -h "$PITR_SOCKET" -p "$PITR_PORT" -d "$SOURCE_DB")
     resilience_wait_for_sql 120 "${PITR_PSQL[@]}" -Atqc "SELECT 1"
     "${PITR_PSQL[@]}" -Atqc "SELECT pg_is_in_recovery()" | grep -Fxq f ||

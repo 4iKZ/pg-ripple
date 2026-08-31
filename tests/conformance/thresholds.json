@@ -1,12 +1,12 @@
 {
-  "_comment": "Conformance policy and pass-rate thresholds for v0.134.0.",
+  "_comment": "Conformance policy and pass-rate thresholds for v0.136.0.",
   "_doc": "The policy value is authoritative: required suites fail closed; informational suites report without blocking.",
   "suites": {
     "w3c_sparql11": {
-      "threshold": 0.95,
+      "threshold": 1.0,
       "policy": "required",
       "blocking": true,
-      "description": "W3C SPARQL 1.1 smoke suite"
+      "description": "Locked 324-case W3C SPARQL 1.1 suite"
     },
     "jena": {
       "threshold": 0.95,
@@ -30,7 +30,7 @@
       "threshold": 0.95,
       "policy": "informational",
       "blocking": false,
-      "description": "OWL 2 RL conformance"
+      "description": "OWL 2 RL source acquisition only; no current conformance result"
     },
     "entailment_regimes": {
       "threshold": 0.90,

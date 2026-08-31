@@ -473,12 +473,12 @@ pub fn encode_batch(terms_and_kinds: &[(&str, i16)]) -> Vec<i64> {
         .collect()
 }
 
-/// After a bulk encode, run `VACUUM ANALYZE _pg_ripple.dictionary` if the
+/// After a bulk encode, run `ANALYZE _pg_ripple.dictionary` if the
 /// number of new terms exceeds `pg_ripple.dict_vacuum_threshold`.
 ///
 /// Called by the bulk loader after `encode_batch` to keep planner statistics
 /// fresh without waiting for the autovacuum daemon. (M15-07, v0.95.0)
-pub(crate) fn maybe_vacuum_dictionary(new_terms: usize) {
+pub(crate) fn maybe_analyze_dictionary(new_terms: usize) {
     let threshold = crate::gucs::storage::DICT_VACUUM_THRESHOLD.get();
     if threshold <= 0 {
         return; // VACUUM disabled by GUC.
@@ -488,10 +488,10 @@ pub(crate) fn maybe_vacuum_dictionary(new_terms: usize) {
     }
     pgrx::debug1!(
         "dict_vacuum_threshold reached ({new_terms} new terms ≥ {threshold}): \
-         running VACUUM ANALYZE _pg_ripple.dictionary"
+         running ANALYZE _pg_ripple.dictionary"
     );
-    if let Err(e) = pgrx::Spi::run("VACUUM ANALYZE _pg_ripple.dictionary") {
-        pgrx::warning!("dictionary VACUUM ANALYZE failed (non-fatal): {e}");
+    if let Err(e) = pgrx::Spi::run("ANALYZE _pg_ripple.dictionary") {
+        pgrx::warning!("dictionary ANALYZE failed (non-fatal): {e}");
     }
 }
 

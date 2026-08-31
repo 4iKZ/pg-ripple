@@ -65,7 +65,7 @@ This page documents the hard limits, default quotas, and tunable caps in pg_ripp
 | CDC watermark batch size | 100 events | `pg_ripple.cdc_watermark_batch_size` | — |
 | VP promotion batch size | 10,000 rows | `pg_ripple.vp_promotion_batch_size` | — |
 | Bidi relay max in-flight | 1,000 ops | `pg_ripple.bidi_relay_max_inflight` | Drop-oldest policy |
-| Dictionary vacuum threshold | 10,000 terms | `pg_ripple.dict_vacuum_threshold` | Post-encode auto-VACUUM |
+| Dictionary analysis threshold | 10,000 terms | `pg_ripple.dict_vacuum_threshold` | Post-encode `ANALYZE`; the GUC name is retained for compatibility |
 
 ## Dictionary and Encoding
 

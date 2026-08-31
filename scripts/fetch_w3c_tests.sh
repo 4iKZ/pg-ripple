@@ -135,5 +135,5 @@ ok "W3C SPARQL 1.1 test suite ready."
 ok "Test data directory: ${OUTPUT_DIR}"
 echo
 info "Run the smoke subset:   cargo test --test w3c_smoke"
-info "Run the full suite:     cargo test --test w3c_suite -- --test-threads 8"
+info "Run the locked suite:   cargo test --test w3c_suite -- --nocapture"
 info "Override data dir:      W3C_TEST_DIR=${OUTPUT_DIR} cargo test --test w3c_smoke"

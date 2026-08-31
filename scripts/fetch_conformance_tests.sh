@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # scripts/fetch_conformance_tests.sh
 #
-# Downloads conformance test data for pg_ripple's three test suites:
+# Downloads external test data used by pg_ripple's qualification jobs:
 #   • W3C SPARQL 1.1 test suite  (--w3c, default)
 #   • Apache Jena test suite     (--jena)
 #   • WatDiv query templates     (--watdiv)
+#   • W3C OWL 2 RL source       (--owl2rl)
 #
 # Extends scripts/fetch_w3c_tests.sh to cover Jena and WatDiv.
 #
@@ -13,12 +14,14 @@
 #   bash scripts/fetch_conformance_tests.sh --w3c      # W3C only
 #   bash scripts/fetch_conformance_tests.sh --jena     # Jena only
 #   bash scripts/fetch_conformance_tests.sh --watdiv   # WatDiv only
+#   bash scripts/fetch_conformance_tests.sh --owl2rl   # OWL source only
 #   bash scripts/fetch_conformance_tests.sh --force    # re-download everything
 #
 # Environment variables:
 #   W3C_TEST_DIR      Output directory for W3C tests  (default: tests/w3c/data)
 #   JENA_TEST_DIR     Output directory for Jena tests (default: tests/jena/data)
-#   WATDIV_DATA_DIR   Output directory for WatDiv RDF data (default: tests/watdiv/data)
+#   OWL2RL_TEST_DIR   Output directory for OWL source (default: tests/owl2rl/data)
+#   WATDIV_DATA_DIR   Output directory for generated WatDiv data (default: tests/watdiv/data)
 #   WATDIV_TMPL_DIR   Output directory for WatDiv templates (default: tests/watdiv/templates)
 #
 # Downloads are verified against SHA-256 checksums.
@@ -157,7 +160,7 @@ WATDIV_TMPL_SHA256="ce1707e2ceec57ae8f2d18e0d1e0b8905db31a2c11c6e2768b1eb16ec023
 # WatDiv data generation: requires the watdiv binary or Docker image.
 # If WATDIV_BINARY is set, use it; otherwise try Docker.
 WATDIV_BINARY="${WATDIV_BINARY:-}"
-WATDIV_SCALE="${WATDIV_SCALE:-10000000}"   # 10M triples (default for CI)
+WATDIV_SCALE="${WATDIV_SCALE:-10000000}"   # 10M triples when generation is requested
 
 fetch_watdiv_templates() {
     if [[ -d "${WATDIV_TMPL_DIR}" && "${FORCE}" != "--force" ]]; then
@@ -266,16 +269,34 @@ fetch_watdiv() {
 OWL2RL_DIR="${OWL2RL_TEST_DIR:-${PROJECT_ROOT}/tests/owl2rl/data}"
 
 fetch_owl2rl() {
-    info "Fetching W3C OWL 2 RL test manifests..."
+    info "Fetching the pinned W3C OWL 2 test corpus..."
 
-    if [[ -d "${OWL2RL_DIR}" && "${FORCE}" != "--force" ]]; then
-        if python3 "${SCRIPT_DIR}/validate_conformance_sources.py" \
-            --suite owl2_rl --directory "${OWL2RL_DIR}"; then
+    if [[ -f "${OWL2RL_DIR}/all.rdf" && "${FORCE}" != "--force" ]]; then
+        if validate_source owl2_rl --directory "${OWL2RL_DIR}"; then
             ok "OWL 2 RL test data already present at ${OWL2RL_DIR}"
             return 0
         fi
     fi
-    fail "OWL 2 RL corpus is missing; provide the pinned corpus under ${OWL2RL_DIR}"
+
+    local archive="/tmp/owl2rl-all-$$.rdf"
+    trap "rm -f '${archive}'" EXIT
+    local url="https://www.w3.org/2009/11/owl-test/all.rdf"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --retry 3 --retry-delay 5 "${url}" -o "${archive}" \
+            || fail "OWL 2 RL corpus download failed."
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --tries=3 --wait=5 "${url}" -O "${archive}" \
+            || fail "OWL 2 RL corpus download failed."
+    else
+        fail "Neither curl nor wget is available."
+    fi
+
+    validate_source owl2_rl --archive "${archive}"
+    mkdir -p "${OWL2RL_DIR}"
+    cp "${archive}" "${OWL2RL_DIR}/all.rdf"
+    validate_source owl2_rl --directory "${OWL2RL_DIR}"
+    ok "OWL 2 RL corpus ready at ${OWL2RL_DIR}/all.rdf"
 }
 
 # ── BSBM data (v0.46.0) ───────────────────────────────────────────────────────
@@ -294,27 +315,19 @@ fetch_bsbm() {
 
     mkdir -p "${BSBM_DATA_DIR}"
 
-    # BSBM requires the Java-based data generator.  We check for it and skip
-    # gracefully if it's not available.
     if ! command -v java >/dev/null 2>&1; then
-        info "WARNING: Java not found — BSBM data generation requires Java."
-        info "Install Java and the BSBM tools from http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/"
-        info "BSBM regression tests will skip gracefully without data."
-        return 0
+        fail "Java is required to generate the external BSBM dataset."
     fi
 
     # Check for the BSBM generator jar.
     local BSBM_JAR="${BSBM_JAR:-}"
     if [[ -z "${BSBM_JAR}" ]]; then
-        info "WARNING: BSBM_JAR not set — set it to the path of the BSBM generator jar."
-        info "Download from http://wbsg.informatik.uni-mannheim.de/bizer/berlinsparqlbenchmark/"
-        info "BSBM regression tests will skip gracefully without data."
-        return 0
+        fail "BSBM_JAR must point to the BSBM generator jar."
     fi
 
     info "Generating BSBM 1M-triple dataset (scale factor 1000)..."
     java -jar "${BSBM_JAR}" -pc 1000 -dir "${BSBM_DATA_DIR}" \
-        || { info "WARNING: BSBM data generation failed."; return 0; }
+        || fail "BSBM data generation failed."
 
     ok "BSBM 1M-triple dataset generated at ${BSBM_DATA_DIR}"
 }
@@ -328,9 +341,3 @@ fetch_bsbm() {
 [[ "${DO_BSBM}" == "true" ]]   && fetch_bsbm
 
 ok "Conformance test data fetch complete."
-info "Run the test suites with:"
-info "  cargo test --test w3c_suite"
-info "  cargo test --test jena_suite"
-info "  cargo test --test watdiv_suite"
-info "  cargo test --test owl2rl_suite"
-info "  cargo test --test datalog_convergence_suite"

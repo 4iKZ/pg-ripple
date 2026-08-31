@@ -97,12 +97,12 @@ install:
 # Load BSBM data (override db via: just db=mydb bench-bsbm-load)
 [group: "bench"]
 bench-bsbm-load scale="1":
-    BSBM_SCALE={{scale}} envsubst '$BSBM_SCALE' < benchmarks/bsbm/bsbm_load.sql | psql -h /tmp -p 5432 -d {{db}}
+    psql -X -v ON_ERROR_STOP=1 -v scale={{scale}} -h /tmp -p 5432 -d {{db}} -f benchmarks/bsbm/bsbm_load.sql
 
 # Run BSBM query mix (12 standard BSBM queries)
 [group: "bench"]
 bench-bsbm-queries:
-    psql -h /tmp -p 5432 -d {{db}} -f benchmarks/bsbm/bsbm_queries.sql
+    psql -X -v ON_ERROR_STOP=1 -h /tmp -p 5432 -d {{db}} -f benchmarks/bsbm/bsbm_queries.sql
 
 # Run BSBM HTAP concurrent workload (insert + query under load)
 [group: "bench"]

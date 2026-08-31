@@ -27,10 +27,9 @@ No separate graph database. No data pipelines. No extra infrastructure.
 
 ## What works today (v0.136.0)
 
-pg_ripple publishes immutable, versioned conformance and feature evidence for
-each release. W3C SPARQL 1.1 smoke tests and LUBM are required gates; Jena,
-WatDiv, and OWL 2 RL are explicitly informational until their locked suites
-meet the release thresholds.
+pg_ripple publishes versioned conformance and feature evidence for each release.
+The locked 324-case W3C SPARQL 1.1 suite and LUBM are required gates. Jena,
+WatDiv, and OWL 2 RL remain informational.
 
 | What you can do | How it works |
 |---|---|
@@ -45,7 +44,7 @@ meet the release thresholds.
 | **Export and share** | Export your graph as Turtle, N-Triples, JSON-LD, or RDF/XML. Use JSON-LD framing to produce nested documents shaped for REST APIs or LLM prompts. `export_jsonld_node(iri)` returns all triples for a given subject as a JSON-LD document. `json_ld_load(document, default_graph)` ingests multi-graph JSON-LD documents in one call. `COPY rdf FROM` loads bulk RDF files directly via PostgreSQL's COPY protocol. Arrow IPC bulk export via `pg_ripple_http`: HMAC-SHA256 signed tickets with nonce replay protection, binary IPC stream over `POST /flight/do_get`. |
 | **Standard HTTP endpoint** | The companion `pg_ripple_http` service exposes a W3C SPARQL Protocol endpoint over HTTP/HTTPS. Supports JSON, XML, CSV, Turtle, and JSON-LD responses; typed initial bindings at `POST /sparql/bindings`; authentication; Prometheus metrics (`/metrics`); extension-level metrics via `/metrics/extension` (triple count, active graphs, GUC settings); Docker Compose for easy deployment; full OpenAPI 3.1 specification; and an Arrow/Flight bulk-export endpoint. |
 | **Query remote graph services** | Use the SPARQL `SERVICE` keyword to query external SPARQL endpoints as part of a single query — your local data and a remote public dataset in one request. Includes connection pooling, result caching, safe timeouts, and a circuit breaker (`pg_ripple.federation_circuit_breaker_threshold`) that stops retrying failed endpoints. |
-| **Horizontal scaling with Citus** | Enable `pg_ripple.citus_sharding_enabled` to distribute VP tables across Citus worker nodes. Bound-subject SPARQL patterns are automatically pruned to the correct shard (10–100× speedup). `citus_rebalance()` emits NOTIFY signals so pg-trickle can pause CDC during rebalancing. `citus_rebalance_progress()` reports live shard-move status. |
+| **Experimental horizontal scaling with Citus** | Citus integration is available for bounded pilots. Current CI checks single-node contracts and graceful degradation without Citus. It does not qualify a multi-worker cluster. |
 | **Temporal RDF queries** | `point_in_time(ts TIMESTAMPTZ)` restricts all SPARQL queries in the current session to facts that existed at the given timestamp — enabling as-of queries, audit trails, and temporal joins without schema changes. |
 | **PROV-O data provenance** | Enable `pg_ripple.prov_enabled` to automatically record W3C PROV-O `prov:Activity` + `prov:Entity` triples for every bulk-load operation. `prov_stats()` summarises load history. |
 | **Geospatial queries** | GeoSPARQL 1.1: filter by `geof:within`, `geof:intersects`, and `geof:distance`; compute `geof:buffer`, `geof:convexHull`, `geof:envelope`. Geometry values stored as WKT literals and processed via PostGIS. |
@@ -207,11 +206,11 @@ v0.136.0 carries the hardened candidate release metadata, migration path,
 compatibility correction, and audit-readiness checks for the frozen v1 query
 contract. See [roadmap/v0.136.0.md](roadmap/v0.136.0.md).
 
-v0.133.0 added deterministic crash-recovery qualification, backup/
-restore and failover checks, resource-pressure diagnostics, and the
-`pg_ripple.health()` operations API. The release also keeps the independent migration-graph,
-schema-fingerprint, and upgrade recovery checks plus validated writeback
-configuration. See
+v0.133.0 added resilience scripts and runbooks for crash recovery, backup and
+restore, failover, PITR, and resource pressure. Current CI validates their
+mappings, syntax, and documentation. Operators must run the live matrix on a
+disposable topology. The release also added the `pg_ripple.health()` operations
+API. See
 [ROADMAP.md](ROADMAP.md#production-readiness--ga-qualification-v01281--v01370)
 for the remaining v0.134.0–v0.137.0 production-readiness sequence ahead of
 v1.0.0.
@@ -222,7 +221,7 @@ The v0.112.0–v0.126.0 cycle focuses on hardening, correctness, and operational
 
 ### v1.0.0 — Production Release
 
-The final milestone: full API and documentation freeze, long-term support commitment, and public production dossier. All conformance suites (SPARQL 1.1, SHACL Core, OWL 2 RL, LUBM) remain required gates; performance regression CI and the release evidence dashboard are mandatory artifacts.
+The final milestone includes the API and documentation freeze, long-term support commitment, and public production dossier. SPARQL 1.1, SHACL Core, OWL 2 RL, and LUBM are intended to become required gates. Current-version performance artifacts are also required before v1.0.0.
 
 ---
 
@@ -420,22 +419,22 @@ CREATE EXTENSION pg_ripple;
 
 ## Quality & Testing
 
-pg_ripple is built to production-grade standards:
+The following checks describe the current repository state:
 
-- **W3C conformance** — 100% pass rate on the official SPARQL 1.1 Query, SPARQL 1.1 Update, and SHACL Core test suites (~3 000 tests, parallelized, complete in under 2 minutes)
+- **W3C SPARQL CI suite** — the locked 324-case suite runs serially and is required. The checked v0.136.0 report records 324/324 with no skips or unexpected failures.
 - **Apache Jena test suite** — ~1 000 additional tests covering XSD numeric promotions, timezone-aware date/time, blank-node scoping, and all SPARQL string functions
-- **WatDiv benchmark** — all 100 WatDiv query templates (star, chain, snowflake, complex) validated for correctness against a 10 M-triple dataset with ±0.1% row-count baselines
+- **WatDiv query smoke suite** — 32 checked-in templates execute in the informational job. The current job does not load or qualify a 10 M-triple dataset.
 - **LUBM conformance suite** — all 14 canonical LUBM queries pass against a synthetic university OWL ontology; includes a Datalog validation sub-suite confirming that `infer('owl-rl')` produces correct supertype entailments (v0.44.0)
-- **W3C OWL 2 RL conformance suite** — W3C OWL 2 RL test manifests (entailment, consistency, and inconsistency tests) run in CI; **100% pass rate (66/66) achieved at v0.51.0** — blocking gate in CI (v0.51.0)
+- **W3C OWL 2 RL source check** — CI downloads and checksum-validates the pinned W3C corpus. Historical harness results are not current-release conformance evidence.
 - **Property-based testing** — `proptest` suites assert algebraic invariants: SPARQL algebra round-trips produce byte-identical SQL, dictionary encode/decode is always stable and collision-free for 10,000 random distinct terms, JSON-LD framing preserves all matching IRIs (v0.51.0)
 - **Extensive test suite** — 300+ pg_regress tests and property-based (`proptest`) suites cover every SQL-exposed function, every feature, and every edge case (as of v0.126.0)
 - **Security testing** — resistance to injection attacks, malformed inputs, and resource exhaustion
 - **Fuzz testing** — the federation result decoder, query pipeline, and URL host parser are continuously fuzz-tested (nightly, 120 s per target); arbitrary XML/JSON from remote SERVICE endpoints cannot cause a crash or panic (v0.51.0)
-- **Performance regression CI** — BSBM benchmark (1M-triple product dataset, 12 explore queries) and automated throughput benchmarks fail the build if performance drops by more than 10% (v0.51.0)
+- **BSBM execution gate** — CI generates about one million triples, asserts the fixture size, and runs the adapted 12-query mix with SQL errors treated as failures. No latency regression threshold is claimed until enough comparable runs exist.
 - **Security CI** — `cargo audit --deny warnings` runs on every pull request; SBOM (CycloneDX) generated and attached to every release; GitHub Actions refs pinned to full SHA; Docker release images scanned via Trivy with immutable digest
-- **Stability** — 72-hour soak test with published artifacts (memory trend, merge latency, query p50/p95/p99, error counts), memory leak detection, and crash recovery testing (v0.67.0)
+- **Stability tooling** — the repository includes a soak harness and live crash/recovery scripts. Current CI validates the scripts but does not execute a 72-hour soak, PITR, or failover matrix.
 - **Upgrade and backup acceptance** — migration chain from all supported 0.x versions, `pg_dump`/restore round trip, and rollback guidance tested in CI (v0.67.0)
-- **Public benchmark baselines** — BSBM, WatDiv, LUBM, bulk N-Triples/Turtle load, HTAP merge throughput, construct-rule incremental maintenance, Datalog DRed, vector hybrid search, Arrow IPC export, Citus fan-out, bidi relay throughput, and Magellan ER benchmark (Abt-Buy, DBLP-ACM) published with hardware, dataset size, and raw output; baselines refreshed to v0.126.0
+- **Performance evidence** — `benchmarks/ci_benchmark.sh` produces a bounded current-version JSON result and raw log. Older merge and PageRank CSV files are historical and lack enough provenance for current capacity decisions.
 
 ---
 

@@ -97,7 +97,7 @@ jobs:
         run: cargo pgrx install --pg-config /usr/lib/postgresql/18/bin/pg_config
 
       - name: Start pgrx PostgreSQL 18
-        run: cargo pgrx start pg18 --postgresql-conf "allow_system_table_mods=on"
+        run: cargo pgrx start pg18 --postgresql-conf "shared_preload_libraries=pg_ripple"
 
       - name: Run migration chain test
         run: bash tests/test_migration_chain.sh
@@ -106,7 +106,11 @@ jobs:
         run: bash tests/schema_fingerprint.sh
 
       - name: Run upgrade recovery test
-        run: bash tests/upgrade_recovery.sh
+        env:
+          PG_RIPPLE_RESILIENCE_REQUIRE_SIGKILL: "1"
+        run: |
+          export PATH="/usr/lib/postgresql/18/bin:$PATH"
+          bash tests/upgrade_recovery.sh
 
       - name: Stop pgrx PostgreSQL 18
         if: always()
