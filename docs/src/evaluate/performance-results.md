@@ -25,6 +25,8 @@ The manual `Benchmark` workflow runs a bounded `synthetic-100k-v1` workload. It 
 
 The required BSBM job separately loads about one million triples from the repository's adapted fixture and fails on load, scale, or query errors. It records elapsed time but has no latency regression threshold.
 
+The checked-in v0.136.0 run at commit `993af4fef88e` measured 5,666 inserted triples/s, 0.819 ms average point-query latency, and 0.277 ms average single-pattern SPARQL latency on an Apple M1 Pro. The [JSON, raw output, and sanitized environment](https://github.com/trickle-labs/pg-ripple/tree/main/benchmarks/results) are retained together. This is one bounded run, not a capacity or cross-system comparison.
+
 Historical merge and PageRank CSV files have incompatible schemas and no retained raw evidence for current releases. They are not current baselines.
 
 ## Not yet qualified by current evidence

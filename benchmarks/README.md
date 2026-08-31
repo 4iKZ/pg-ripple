@@ -39,3 +39,17 @@ The SQL and shell files in this directory support targeted experiments for merge
 `merge_throughput_history.csv`, `pagerank_throughput_history.csv`, and `merge_throughput_baselines.json` are historical, unverified records. Their schemas differ and no retained raw artifacts tie them to the current architecture. Do not use them as v0.136.0 capacity or regression baselines.
 
 Record new results under `benchmarks/results/` only with sanitized environment details and raw output.
+
+## Checked-in result
+
+The first result using this evidence format is for pg_ripple 0.136.0 at commit
+`993af4fef88e` on an Apple M1 Pro:
+
+| Fixture | Insert throughput | Point query | SPARQL BGP |
+|---|---:|---:|---:|
+| `synthetic-100k-v1` | 5,666 triples/s | 0.819 ms | 0.277 ms |
+
+See the [JSON result](results/v0.136.0-993af4fe-m1-pro.json),
+[raw output](results/v0.136.0-993af4fe-m1-pro.txt), and
+[sanitized environment](results/v0.136.0-993af4fe-m1-pro-environment.txt).
+This is one bounded run, not a capacity or cross-system comparison.
